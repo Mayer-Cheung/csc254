@@ -8,6 +8,13 @@
 template <class T> class Pointer;
 template <class T> void free(Pointer<T>& obj);
 
+template <typename T>
+class Tombstone {
+public:
+    int cnt;
+    T* pointee;
+};
+
 template <class T>
 class Pointer {
 public:
@@ -17,28 +24,33 @@ public:
         ts->cnt++;
     }
     Pointer<T>(T* p) {
-        ts = new Tombstone();
+        ts = new Tombstone<T>();
         ts->cnt = 1;
         ts->pointee = p;
     }
     ~Pointer<T>() {
-        if (ts->pointee != NULL) {
+        ts->cnt--;
+        if (ts->cnt == 0) {
             delete ts->pointee;
-            ts->pointee = NULL;
+            delete ts;            
         }
-        delete ts;
     }
     T& operator*() const {
         return *(ts->pointee);
     }
     T* operator->() const {
-        if (ts->cnt == 0)
-            return NULL;
         return ts->pointee;
     }
     Pointer<T>& operator=(const Pointer<T>& p) {
-        ts = p.ts;
-        ts->cnt++;
+        if (this != &p) {
+            if (ts->cnt == 0) {
+                delete ts->pointee;
+                delete ts;
+            }
+            ts = p.ts;
+            ts->cnt++;
+        }
+        return *this;
     }
 
     // equality comparisons:
@@ -46,31 +58,32 @@ public:
         return p.ts == ts;
     }
     bool operator!=(const Pointer<T>& p) const {
-        return p.ts == ts;
+        return p.ts != ts;
     }
     bool operator==(const int n) const {
-        return ts == NULL && n == 0;
+        //  return ts == NULL && n == 0;
         // true iff Pointer is null and int is zero
+        if (ts == NULL)
+            return n == 0;
+        else
+            return *(ts->pointee) == n;
     }
     bool operator!=(const int n) const {
-        return !(ts == NULL && n == 0);
+        //  return !(ts == NULL && n == 0);
         // false iff Pointer is null and int is zero
+        if (ts == NULL)
+            return n != 0;
+        else
+            return *(ts->pointee) != n;
     }
-    class Tombstone {
-    public:
-        int cnt;
-        T* pointee;
-    };
-    Tombstone* ts;
+    Tombstone<T>* ts;
 };
 template <class T>
     void free(Pointer<T>& p) {
-        if (p.ts->pointee == 0 || p.ts->pointee == NULL)
-            return;
-        (p.ts->cnt)--;
+        p.ts->cnt--;
         if (p.ts->cnt == 0) {
             delete p.ts->pointee;
-            p.ts->pointee = NULL;
+            delete p.ts;            
         }
     }
 
